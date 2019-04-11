@@ -1,0 +1,1 @@
+An overview of K-Means and EM algorithms. To view the project open the .pdf.
