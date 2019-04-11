@@ -3,10 +3,10 @@ title: "Clustering Algorithms"
 author: "Derek Wayne"
 date: "`r format(Sys.time(), '%d %B %Y')`"
 output:
-  pdf_document: default
-  html_notebook: default
   html_document:
     df_print: paged
+  html_notebook: default
+  pdf_document: default
 subtitle: Comparison of K-Means and EM
 abstract: |
   This is meant to be a short overview of the implementation of the K-means and EM algorithms for clustering generated
@@ -112,7 +112,9 @@ conv <- data.frame("Iterations" = 1:length(r$cost), "Cost" = r$cost)
 ggplot(conv, aes(Iterations, Cost)) + geom_line() + geom_point() + theme_bw()
 ```
 The misclassification error is then `r mc_err`.
+
 # EM
+
 Modeling the data used above as a mixture of two bivariate Gaussians; then for a given datapoint $\mathbf{x}$,
 $$
 p(\mathbf{x}) = \pi_1 \mathcal{N}(\mathbf{x} |\mathbf{\mu}_1, \Sigma) + \pi_2 \mathcal{N}(\mathbf{x} |\mathbf{\mu}_2, \Sigma)
@@ -223,6 +225,7 @@ conv <- data.frame("Iterations" = 1:length(res$loglik), "LogLikelihood" = res$lo
 ggplot(conv, aes(Iterations, LogLikelihood)) + geom_line() + geom_point() + theme_bw()
 ```
 # Results
+
 The K-Means procedure converges in 10 iterations whereas the EM reaches near convergence quickly; after about 5 iterations, after which the changes to the log-likelihood are quite small. However, K-Means did result in a steep initial improvement. The K-Means is very clearly biased with respect to the $L_2$ norm. It uses hard partitioning to assign points to each cluster vs. the EM, which assigns based on the expectation of a point belonging to a particular cluster. Therefore, it can be seen that K-Means does not take into account the covariance structure of the data like the EM does. This produces the large difference in the misclassification errors between the two methods. To demonstrate that this conclusion is not dependent of the data we will generate new multivariate Gaussian data and run the procedures again.
 
 ```{r}
