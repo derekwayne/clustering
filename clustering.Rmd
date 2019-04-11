@@ -3,10 +3,10 @@ title: "Clustering Algorithms"
 author: "Derek Wayne"
 date: "`r format(Sys.time(), '%d %B %Y')`"
 output:
+  pdf_document: default
+  html_notebook: default
   html_document:
     df_print: paged
-  html_notebook: default
-  pdf_document: default
 subtitle: Comparison of K-Means and EM
 abstract: |
   This is meant to be a short overview of the implementation of the K-means and EM algorithms for clustering generated
