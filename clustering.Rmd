@@ -142,7 +142,7 @@ $$
 The following function is to compute the multivariate Gaussian density. However, care must be taken as it involved inverting a covariance matrix. The base solve function in R can provide results that are ruined by rounding error. Since the covariance matrix is an SPD (semi) matrix the Cholesky factorization is a natural choice for speed and numerical stability.
 ```{r}
 normal_density <- function(x, mean, sigma) {
-  cf <- chol(Sigma)
+  cf <- chol(sigma)
   tmp <- backsolve(cf, t(x) - mean, transpose = TRUE)
   rss <- colSums(tmp^2)
   lv <- -sum(log(diag(cf))) - 0.5 * ncol(x) * log(2 * 
@@ -209,7 +209,7 @@ EM <- function(x, init, max.iter, tol=10e-4) {
 ```
 ```{r}
 theta.init <- list(0.5, 0.5, c(0,0), c(1,1), diag(2), diag(2)) # initializations
-res <- EM(sample, theta.init, 50)
+res <- EM(sample, theta.init, 100)
 pred <- apply(res$responsibilities, 1, function(row) which.max(row))
 mc_err2 <- mean(pred != classes)
 ```
@@ -222,11 +222,13 @@ p <- ggplot(data, aes(X1, X2, color = Class)) +
 p
 
 conv <- data.frame("Iterations" = 1:length(res$loglik), "LogLikelihood" = res$loglik)
-ggplot(conv, aes(Iterations, LogLikelihood)) + geom_line() + geom_point() + theme_bw()
+p <- ggplot(conv, aes(Iterations, LogLikelihood)) + geom_line() + geom_point() + theme_bw() +
+  ylim(range(res$loglik[2:length(res$loglik)]))
+suppressWarnings(print(p))
 ```
 # Results
 
-The K-Means procedure converges in 10 iterations whereas the EM reaches near convergence quickly; after about 5 iterations, after which the changes to the log-likelihood are quite small. However, K-Means did result in a steep initial improvement. The K-Means is very clearly biased with respect to the $L_2$ norm. It uses hard partitioning to assign points to each cluster vs. the EM, which assigns based on the expectation of a point belonging to a particular cluster. Therefore, it can be seen that K-Means does not take into account the covariance structure of the data like the EM does. This produces the large difference in the misclassification errors between the two methods. To demonstrate that this conclusion is not dependent of the data we will generate new multivariate Gaussian data and run the procedures again.
+The K-Means procedure converges in about 10 iterations whereas the EM converges in about 30. The K-Means is very clearly biased with respect to the $L_2$ norm. It uses hard partitioning to assign points to each cluster vs. the EM, which assigns based on the expectation of a point belonging to a particular cluster. Therefore, it can be seen that K-Means does not take into account the covariance structure of the data like the EM does. This produces difference in the misclassification errors between the two methods. To demonstrate that this conclusion is not dependent of the data we will generate new multivariate Gaussian data and run the procedures again.
 
 ```{r}
 data <- list()
@@ -249,13 +251,16 @@ for (i in 1:10) {
   mc_err1 <- mean(classes != r1$cluster)
   new_results$K_Means[i] <- mc_err1
   
-  r2 <- EM(t(X), theta.init, 50)
+  r2 <- EM(t(X), theta.init, 20)
   pred <- apply(r2$responsibilities, 1, function(row) which.max(row))
   mc_err2 <- mean(classes != pred)
   new_results$EM[i] <- mc_err2
 }
 new_results$Absolute_Diff <- abs(new_results$K_Means - new_results$EM)
 new_results
+sum(new_results$K_Means>new_results$EM)/10
 ```
-By applying the two algorithms for 10 independent realizations of the data we can see that the conclusions drawn above still hold. That is, on on average the EM procedure performs better when applied to Gaussian mixture models.
+By applying the two algorithms for 10 independent realizations of the data we can see that performance depends greatly on the data. However, EM is much better suited for capturing the structure since the data was generated from a mixture of Gaussians. If the clusters were better seperated, both methods would give similair results but K-means converges faster. It is also worth noting that the generative EM model, is able to produce new observations.
+
+To view an interactive web application showcasing the performance of the methods discussed here visit: https://derekwayne.shinyapps.io/KM_and_EM/
 

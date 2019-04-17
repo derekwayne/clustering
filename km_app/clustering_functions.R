@@ -1,4 +1,4 @@
-mv_data <- function(mu_1, mu_2, Sigma) {
+mv_data <- function(mu_1, mu_2, Sigma_1, Sigma_2) {
   sample_1 <- mvrnorm(n=200, mu=mu_1, Sigma = Sigma_1)
   sample_2 <- mvrnorm(n=200, mu=mu_2, Sigma = Sigma_2)
   

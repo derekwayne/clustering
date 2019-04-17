@@ -1,0 +1,10 @@
+name: Publish Document
+title:
+username:
+account: rpubs
+server: rpubs.com
+hostUrl: rpubs.com
+appId: https://api.rpubs.com/api/v1/document/485581/4db7e4df056b475e88b118087ed61f78
+bundleId: https://api.rpubs.com/api/v1/document/485581/4db7e4df056b475e88b118087ed61f78
+url: http://rpubs.com/MrWayne/485581
+when: 1555535678.3981

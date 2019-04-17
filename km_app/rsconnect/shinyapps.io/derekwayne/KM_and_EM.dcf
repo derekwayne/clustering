@@ -1,0 +1,12 @@
+name: KM_and_EM
+title: KM_and_EM
+username:
+account: derekwayne
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 872628
+bundleId: 2019125
+url: https://derekwayne.shinyapps.io/KM_and_EM/
+when: 1555523872.52404
+asMultiple: FALSE
+asStatic: FALSE
