@@ -100,15 +100,15 @@ $$
 ## Vanilla Algorithm
 Given mean $\mu_k$,
 
-1. E-step: Minimize $J$ with respect to $r_{ni}$, $i=1,\dots,K$:
+1. E-step: Minimize $J$ with respect to $r_{nk}$:
 $$
-r_{ni} =
+r_{nk} =
 \begin{cases}
 1 & ;k= arg \min_j \|\mathbf{x}_n-\mu_j \|^2 \\
 0 & ; \text{otherwise}
 \end{cases}
 $$
-2. Given $r_{ni}$ minimize $J$ with respect to $\mu_k$,
+2. Given $r_{nk}$ minimize $J$ with respect to $\mu_k$,
 $$
 \mu_k = \frac{\sum_{n}r_{nk}\mathbf{x}_n}{\sum_{n}r_{nk}}
 $$
@@ -200,30 +200,35 @@ ggplot(conv, aes(Iterations, Cost)) + geom_line() + geom_point() + theme_bw()
 ```
 
 ## Results of K-Means
-The misclassification error is then `r mc_err`. From the resulting plot it is evident that K-means is not appropriate for this particular dataset. This of course is obvious since we know how the data was generated. A not so obvious drawback from this analysis is that the number of components was required a-priori. In practice, a bad guess can lead to incorrect results. In the case of the data used here, the clusters are not easily separable and the algorithm has given suboptimal splits between cluster means. In other examples this outcome may occur even with reasonably separable clusters due to the convergence to local minima.
+The misclassification error is then `r mc_err`. From the resulting plot it is evident that K-means is not appropriate for this particular dataset. This of course is obvious since we know how the data was generated. A not so obvious drawback from this analysis is that the number of components was required a-priori. In practice, a bad guess can lead to incorrect results. In the case of the data used here, the clusters are not easily separable and the algorithm has given suboptimal splits between cluster means. In other examples this outcome may occur even with reasonably separable clusters due to the convergence to local minima. The two steps involved in the algorithm involve computing first, an expectation, and second, finding a minimum (which can be shown to be equivalent to finding a maximum). Thus, K-means can be seen as a variant of a more flexible model -- the expectation maximization algorithm (EM).
 
 
 # EM
 
-```{r pressure, echo=F, out.width = '50%'}
-knitr::include_graphics("graphical_model.png")
-```
+For the EM algorithm we adopt the perspective of having data with latent variables, which specify membership to distinct subpopulations. From the parametric model proposed in an earlier section,
+
 
 Modeling the data used above as a mixture of two bivariate Gaussians; then for a given datapoint $\mathbf{x}$,
 $$
-p(\mathbf{x}) = \pi_1 \mathcal{N}(\mathbf{x} |\mathbf{\mu}_1, \Sigma) + \pi_2 \mathcal{N}(\mathbf{x} |\mathbf{\mu}_2, \Sigma)
+p(\mathbf{x}) = \phi_1 \mathcal{N}(\mathbf{x} |\mathbf{\mu}_1, \Sigma) + \phi_2 \mathcal{N}(\mathbf{x} |\mathbf{\mu}_2, \Sigma)
 $$
-For each datapoint observed there is a corresponding latent variable $\mathbf{z}_n$. Bayes' Theorem leads us to the following formulation,
+For each datapoint observed there is a corresponding latent variable $\mathbf{z}_n$. We can model the structure of conditional dependence between the parameters and variables by using a directed acyclic graph:
+
+```{r pressure, echo=F, out.width = '30%'}
+knitr::include_graphics("graphical_model.png")
+```
+
+With respect to the latent variables $\mathbf{z}_n$, Bayes' Theorem leads us to the following formulation,
 $$
-\gamma(z_k) = P\{z_k = 1 \, | \, \mathbf{x} \} = \frac{\pi_k\mathcal{N}(\mathbf{x} |\mathbf{\mu}_k, \Sigma)}{\pi_1 \mathcal{N}(\mathbf{x} |\mathbf{\mu}_1, \Sigma) + \pi_2 \mathcal{N}(\mathbf{x} |\mathbf{\mu}_2, \Sigma)}
+\gamma(z_k) = P\{z_k = 1 \, | \, \mathbf{x} \} = \frac{\pi_k\mathcal{N}(\mathbf{x} |\mathbf{\mu}_k, \Sigma)}{\phi_1 \mathcal{N}(\mathbf{x} |\mathbf{\mu}_1, \Sigma) + \phi_2 \mathcal{N}(\mathbf{x} |\mathbf{\mu}_2, \Sigma)}
 $$
-Thus the parameters to be estimates are denoted by $\mathbf{\theta} = \{\mathbf{\mu}_1, \mathbf{\mu_2}, \pi_1, \pi_2, \Sigma \}$. Under the assumption of latent variables we consider the complete data likelihood to be
+Thus the parameters to be estimates are denoted by $\mathbf{\theta} = \{\mathbf{\mu}_1, \mathbf{\mu_2}, \phi_1, \phi_2, \Sigma \}$. Under the assumption of latent variables we consider the complete data likelihood to be
 $$
-p(\mathbf{X}, \mathbf{Z} \, | \, \mathbf{\theta}) = \prod_{n=1}^N \bigg\{ \bigg[\pi_1\mathcal{N}(\mathbf{x} |\mathbf{\mu}_1, \Sigma)\bigg]^{z_{n1}} \bigg[\pi_2 \mathcal{N}(\mathbf{x} |\mathbf{\mu}_2, \Sigma) \bigg]^{z_{n2}} \bigg\}
+p(\mathbf{X}, \mathbf{Z} \, | \, \mathbf{\theta}) = \prod_{n=1}^N \bigg\{ \bigg[\phi_1\mathcal{N}(\mathbf{x} |\mathbf{\mu}_1, \Sigma)\bigg]^{z_{n1}} \bigg[\phi_2 \mathcal{N}(\mathbf{x} |\mathbf{\mu}_2, \Sigma) \bigg]^{z_{n2}} \bigg\}
 $$
 and so the complete data log-likelihood is
 $$
-log \,p(\mathbf{X}, \mathbf{Z} \, | \, \mathbf{\theta}) = \sum_{n=1}^N\bigg\{ z_{n1}log\pi_1 + z_{n1} \, log \,\mathcal{N}(\mathbf{x} |\mathbf{\mu}_1, \Sigma) + z_{n2}log \pi_2 + z_{n2} \, log \, \mathcal{N}(\mathbf{x} |\mathbf{\mu}_2, \Sigma) \bigg\}
+log \,p(\mathbf{X}, \mathbf{Z} \, | \, \mathbf{\theta}) = \sum_{n=1}^N\bigg\{ z_{n1}log\phi_1 + z_{n1} \, log \,\mathcal{N}(\mathbf{x} |\mathbf{\mu}_1, \Sigma) + z_{n2}log \phi_2 + z_{n2} \, log \, \mathcal{N}(\mathbf{x} |\mathbf{\mu}_2, \Sigma) \bigg\}
 $$
 leading to the maximum likelihood estimates
 $$
