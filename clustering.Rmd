@@ -1,5 +1,5 @@
 ---
-title: "Clustering Algorithms"
+title: "Cluster Analysis"
 knit: (function(input_file, encoding) {
   out_dir <- 'docs';
   rmarkdown::render(input_file,
@@ -7,44 +7,92 @@ knit: (function(input_file, encoding) {
  output_file=file.path(dirname(input_file), out_dir, 'index.html'))})
 author: "Derek Wayne"
 date: "`r format(Sys.time(), '%d %B %Y')`"
+header-includes:
+   - \usepackage{tikz}
+   - \usetikzlibrary{bayesnet}
 output:
-  html_document:
+  rmdformats::html_clean:
+    self_contained: true
+    thumbnails: true
+    lightbox: true
+    gallery: false
+    highlight: tango
     df_print: paged
-  html_notebook: default
-  pdf_document: default
 subtitle: Comparison of K-Means and EM
 abstract: |
   This is meant to be a short overview of the implementation of the K-means and EM algorithms for clustering generated
   multivariate normal data. Performance of the two procedures is compared to gain a deeper understanding of their advantages
-  and limitations.
+  and limitations. "That which has been hidden to you, will eventuall be brought out into the light", a passage from the Bible about how through knowledge of God one dispels ignorance
 ---
+# Data and Model
 
-# K-means
+In the following analysis we will be working with data generated from a Gaussian mixture density. In particular we use two mixture components, each having a bivariate normal distribution, parameterized by means $\mu_1, \mu_2 \in \mathbb{R}^2$, and covariance matrices  $\Sigma_1, \Sigma_2 \in \mathbb{R}^{2\times2}$. Therefore the model for the data will be:
+$$
+f(\mathbf{x}, \theta) = \phi_1\mathcal{N}(\mathbf{x} \, | \, \mu_1, \Sigma_1) + \phi_2\mathcal{N}(\mathbf{x} \, | \, \mu_2, \Sigma_2)
+$$
+where $\theta$ represents all relevant parameters, and $\phi_i$ denote the mixing coefficients.
 
-In order to explore the K-means algorithm we generate data from a mixture of two bivariate normal distributions with parameters $\mu_1 = \begin{bmatrix}0.1 \\ 0.1\end{bmatrix}$, $\mu_2 = \begin{bmatrix}6.0 \\ 0.1 \end{bmatrix}$, and $\sum_1 = \sum_2 = \begin{bmatrix} 10 & 7 \\ 7 & 10 \end{bmatrix}$.
+## Identifiability
+Let $K$ be the convex hull of the class of all two-component mixtures of bivariate normal distributions:
+$$
+K = \bigg\{f(\cdot) : f(\cdot)= \phi_1\mathcal{N}(\mathbf{x} \, | \, \mu_1, \Sigma_1) + \phi_2\mathcal{N}(\mathbf{x} \, | \, \mu_2, \Sigma_2), \phi_i>0, \phi_1 + \phi_2 =1 \bigg\}
+$$
+Then consider using the following parameter values: 
+
+$$
+\mu_1 = \begin{bmatrix}0.1 \\ 0.1\end{bmatrix} \quad \mu_2 = \begin{bmatrix}6.0 \\ 0.1 \end{bmatrix} \quad \sum_1 = \sum_2 = \begin{bmatrix} 10 & 7 \\ 7 & 10 \end{bmatrix} \quad \phi_i=1/2
+$$
+We would obtain the same population distribution if instead $\mu_1 = \begin{bmatrix}6.0 \\ 0.1 \end{bmatrix}$ and $\mu_2 = \begin{bmatrix}0.1 \\ 0.1\end{bmatrix}$. Therefore $\mu_1, \mu_2$ are not identifiable. However, this is not a major concern since it is immaterial how we order the components.
+
+## Data Generation
+
+Since we are interested in comparing performance between two clustering algorithms we wish to preserve the class label indicating which sample data point came from which subpopulation. When we then implement K-means and EM over the data we will hide the label and report misclassifications.
 
 ```{r}
 library(MASS)
 library(ggplot2)
 set.seed(101)
+# Parameters
 mu_1 <- c(0.1, 0.1); mu_2 <- c(6.0, 0.1)
 Sigma <- matrix(c(10, 7, 7, 10), nrow = 2)
 # Generate two samples
 sample_1 <- mvrnorm(n=200, mu=mu_1, Sigma = Sigma)
 sample_2 <- mvrnorm(n=200, mu=mu_2, Sigma = Sigma)
 
-sample <- rbind(sample_1, sample_2)
+sample <- rbind(sample_1, sample_2) # matrix format
 colnames(sample) <- c("X1", "X2")
 classes <- c(rep(1, 200), rep(2, 200))
-data <- as.data.frame(sample)
+data <- as.data.frame(sample) # data frame format
 data["Class"] <- as.factor(classes)
 ```
-```{r echo=FALSE, fig.align='center', fig.cap="Generated Bivariate Normal Data", out.width="70%"}
+
+## Data Plots {.tabset}
+
+### Without labels
+
+```{r echo=FALSE, fig.show= "hold", fig.align='center', fig.cap="Generated Bivariate Normal Data", out.width="70%"}
+p <- ggplot(data, aes(X1, X2, color=factor(1))) +
+  geom_point() + theme_bw()
+legend <- theme(legend.position = c(0.9, 0.2))
+p + legend + scale_color_brewer(palette="Dark2")
+ggplot(data, aes(X1, X2)) + geom_density_2d(colour="red") + theme_bw()
+```
+
+### With labels
+
+```{r echo =FALSE, fig.align='center', fig.cap="Generated Bivariate Normal Data"}
 p <- ggplot(data, aes(X1, X2, color = Class)) +
   geom_point() + stat_ellipse(type = "norm") + theme_bw()
 legend <- theme(legend.position = c(0.9, 0.2))
 p + legend + scale_color_brewer(palette="Dark2")
 ```
+
+## Number of components
+
+If we were completely ignorant of the number of clusters then we could resort to the ad-hoc method of "eyeing" the distribution. The amount of separation between the clusters seems problematic. Looking at the contour plot, we see that two peaks are likely present and so we should start by assuming that we have two coponents in our mixture. This assumption will be validated later for goodness.
+
+
+# K-Means
 Assume that the true class labels are not known. The cost function is defined as,
 $$
 \sum_{n=1}^N\sum_{k=1}^Kr_{nk} \|\mathbf{x}_n - \mathbf{\mu} \|^2_{2}
@@ -96,10 +144,25 @@ km_ <- function(x, centroid, R, max.iter) {
   r <- list(centroid=centroid, R=R, cluster=cluster, cost=cost_vec)
   r
 }
+```
+Before letting the algorithm run we must choose initial centroid locations. This choice can have an effect on overall performance of the procedure. Typically we would get better performance when the inital centroid are not assigned too close together. One way to approach this is called *K-means++*:
 
-X <- t(sample)
+1. Uniformly assign one data point as the first initial centroid.
+2. Compte the euclidean distance between the centroid and all other data points.
+3. Assign the next centroid to a data point with probability proportional to its squared distance from the first centroid.
+```{r}
+X <- sample
+centr.init <- X[sample(nrow(X), size=1), ] # initial centroid
+e.dist <- sqrt(rowSums((X-centr.init)^2)) # compute distance
+probs <- e.dist^2 / (max(e.dist)^2 + 100)
+centr.new <- X[sample(nrow(X), size=1, prob=probs), ]
+```
+
+
+```{r}
+X <- t(X)
 R <- matrix(0, nrow=ncol(X), ncol=2)
-centroid <- matrix(c(0,0,1,1),ncol=2,byrow=TRUE)
+centroid <- matrix(c(centr.init, centr.new),ncol=2,byrow=TRUE)
 r <- km_(X, centroid, R, max.iter = 20)
 mc_err <- mean(classes != r$cluster)
 ```
@@ -119,6 +182,10 @@ ggplot(conv, aes(Iterations, Cost)) + geom_line() + geom_point() + theme_bw()
 The misclassification error is then `r mc_err`.
 
 # EM
+
+```{r pressure, echo=F, out.width = '50%'}
+knitr::include_graphics("graphical_model.png")
+```
 
 Modeling the data used above as a mixture of two bivariate Gaussians; then for a given datapoint $\mathbf{x}$,
 $$

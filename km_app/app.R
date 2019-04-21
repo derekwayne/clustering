@@ -101,9 +101,14 @@ server <- function(input, output) {
     sample <- mv_data(mu_1 = c(input$mu11, input$mu12),
                       mu_2 = c(input$mu21, input$mu22),
                       Sigma_1 = Sigma_1, Sigma_2 = Sigma_2)
-    X <- t(sample)
+    X <- sample
+    centr.init <- X[sample(nrow(X), size=1), ] # initial centroid
+    e.dist <- sqrt(rowSums((X-centr.init)^2)) # compute distance
+    probs <- e.dist^2 / (max(e.dist)^2 + 100)
+    centr.new <- X[sample(nrow(X), size=1, prob=probs), ]
+    X <- t(X)
     R <- matrix(0, nrow=ncol(X), ncol=2)
-    centroid <- matrix(c(5,5,10,-10), ncol=2,byrow=TRUE)
+    centroid <- matrix(c(centr.init, centr.new),ncol=2,byrow=TRUE)
     
     r <- km_(X, centroid, R, max.iter = input$iters) #input from widget
     
