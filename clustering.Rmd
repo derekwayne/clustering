@@ -1,23 +1,22 @@
 ---
 title: "Cluster Analysis"
-knit: (function(input_file, encoding) {
-  out_dir <- 'docs';
-  rmarkdown::render(input_file,
- encoding=encoding,
- output_file=file.path(dirname(input_file), out_dir, 'index.html'))})
 author: "Derek Wayne"
 date: "`r format(Sys.time(), '%d %B %Y')`"
-header-includes:
-   - \usepackage{tikz}
-   - \usetikzlibrary{bayesnet}
 output:
-  rmdformats::html_clean:
-    self_contained: true
-    thumbnails: true
-    lightbox: true
-    gallery: false
-    highlight: tango
+  html_document:
     df_print: paged
+  rmdformats::html_clean:
+    df_print: paged
+    gallery: no
+    highlight: tango
+    lightbox: yes
+    self_contained: yes
+    thumbnails: yes
+knit: (function(input_file, encoding) { out_dir <- 'docs'; rmarkdown::render(input_file,
+  encoding=encoding, output_file=file.path(dirname(input_file), out_dir, 'index.html'))})
+header-includes:
+- \usepackage{tikz}
+- \usetikzlibrary{bayesnet}
 subtitle: Comparison of K-Means and EM
 abstract: |
   This is meant to be a short overview of the implementation of the K-means and EM algorithms for clustering generated
@@ -42,7 +41,7 @@ Then consider using the following parameter values:
 $$
 \mu_1 = \begin{bmatrix}0.1 \\ 0.1\end{bmatrix} \quad \mu_2 = \begin{bmatrix}6.0 \\ 0.1 \end{bmatrix} \quad \sum_1 = \sum_2 = \begin{bmatrix} 10 & 7 \\ 7 & 10 \end{bmatrix} \quad \phi_i=1/2
 $$
-We would obtain the same population distribution if instead $\mu_1 = \begin{bmatrix}6.0 \\ 0.1 \end{bmatrix}$ and $\mu_2 = \begin{bmatrix}0.1 \\ 0.1\end{bmatrix}$. Therefore $\mu_1, \mu_2$ are not identifiable. However, this is not a major concern since it is immaterial how we order the components.
+We would obtain the same population distribution if instead $\mu_1 = \begin{bmatrix}6.0 \\ 0.1 \end{bmatrix}$ and $\mu_2 = \begin{bmatrix}0.1 \\ 0.1\end{bmatrix}$. Therefore $\mu_1, \mu_2$ are not identifiable. However, this is not a major concern since it is immaterial how we order the components. All that is required is either to partition the data into two clusters (as in K-means), or to estimate the parameters of the assumed subpopulations (as in EM).
 
 ## Data Generation
 
@@ -93,11 +92,29 @@ If we were completely ignorant of the number of clusters then we could resort to
 
 
 # K-Means
-Assume that the true class labels are not known. The cost function is defined as,
+Given data the data generated according to the previous section: $\mathbf{x}_1, \dots , \mathbf{x}_{400}$, with $\mathbf{x}_i\in\mathbb{R}^2$; our objective is to partition the data into two sets such that the *within-cluster sum of squares* (WCSS) is at a minimum. The WCSS *cost* function is defined as:
 $$
-\sum_{n=1}^N\sum_{k=1}^Kr_{nk} \|\mathbf{x}_n - \mathbf{\mu} \|^2_{2}
+J=\sum_{n=1}^N\sum_{k=1}^Kr_{nk} \|\mathbf{x}_n - \mathbf{\mu} \|^2_{2}
 $$
-Below we implement the K-means algorithm below with $K=2$.
+
+## Vanilla Algorithm
+Given mean $\mu_k$,
+
+1. E-step: Minimize $J$ with respect to $r_{ni}$, $i=1,\dots,K$:
+$$
+r_{ni} =
+\begin{cases}
+1 & ;k= arg \min_j \|\mathbf{x}_n-\mu_j \|^2 \\
+0 & ; \text{otherwise}
+\end{cases}
+$$
+2. Given $r_{ni}$ minimize $J$ with respect to $\mu_k$,
+$$
+\mu_k = \frac{\sum_{n}r_{nk}\mathbf{x}_n}{\sum_{n}r_{nk}}
+$$
+The algorithm has converged when there ceases to be any change in mean assignments or the maximum number of iterations is reached. It's important to note that this does not guarantee convergence to a global optimum, only a local one. Thus, performance may depend on the method of centroid initialization. We will return to this subject after the following implementation.
+
+With $K=2$:
 ```{r}
 cost <- function(x, centroid, R) {
   sum((x - t(centroid) %*% t(R)) ** 2)
@@ -145,7 +162,9 @@ km_ <- function(x, centroid, R, max.iter) {
   r
 }
 ```
-Before letting the algorithm run we must choose initial centroid locations. This choice can have an effect on overall performance of the procedure. Typically we would get better performance when the inital centroid are not assigned too close together. One way to approach this is called *K-means++*:
+
+## Initializing centroids
+Before letting the algorithm run we must choose initial centroid locations. This choice can have an effect on overall performance of the procedure as mentioned earlier. Typically we would get better performance when the inital centroid are not assigned too close together. One way to approach this is called *K-means++*, see *k-means++: The Advantages of Careful Seeding* http://ilpubs.stanford.edu:8090/778/1/2006-13.pdf.
 
 1. Uniformly assign one data point as the first initial centroid.
 2. Compte the euclidean distance between the centroid and all other data points.
@@ -179,7 +198,10 @@ ggplot(data, aes(x=X1, y=X2, col=Class)) + geom_point() +
 conv <- data.frame("Iterations" = 1:length(r$cost), "Cost" = r$cost)
 ggplot(conv, aes(Iterations, Cost)) + geom_line() + geom_point() + theme_bw()
 ```
-The misclassification error is then `r mc_err`.
+
+## Results of K-Means
+The misclassification error is then `r mc_err`. From the resulting plot it is evident that K-means is not appropriate for this particular dataset. This of course is obvious since we know how the data was generated. A not so obvious drawback from this analysis is that the number of components was required a-priori. In practice, a bad guess can lead to incorrect results. In the case of the data used here, the clusters are not easily separable and the algorithm has given suboptimal splits between cluster means. In other examples this outcome may occur even with reasonably separable clusters due to the convergence to local minima.
+
 
 # EM
 
