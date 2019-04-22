@@ -112,6 +112,7 @@ $$
 $$
 \mu_k = \frac{\sum_{n}r_{nk}\mathbf{x}_n}{\sum_{n}r_{nk}}
 $$
+
 The algorithm has converged when there ceases to be any change in mean assignments or the maximum number of iterations is reached. It's important to note that this does not guarantee convergence to a global optimum, only a local one. Thus, performance may depend on the method of centroid initialization. We will return to this subject after the following implementation.
 
 With $K=2$:
@@ -195,6 +196,7 @@ ggplot(data, aes(x=X1, y=X2, col=Class)) + geom_point() +
              size=5, shape=3, color="red", stroke=2) +
   theme_bw() + scale_color_brewer(palette="Dark2")
 
+
 conv <- data.frame("Iterations" = 1:length(r$cost), "Cost" = r$cost)
 ggplot(conv, aes(Iterations, Cost)) + geom_line() + geom_point() + theme_bw()
 ```
@@ -214,31 +216,45 @@ p(\mathbf{x}) = \phi_1 \mathcal{N}(\mathbf{x} |\mathbf{\mu}_1, \Sigma) + \phi_2 
 $$
 For each datapoint observed there is a corresponding latent variable $\mathbf{z}_n$. We can model the structure of conditional dependence between the parameters and variables by using a directed acyclic graph:
 
-```{r pressure, echo=F, out.width = '30%'}
+```{r pressure, echo=F, out.width = '30%', fig.align='center'}
 knitr::include_graphics("graphical_model.png")
 ```
 
 With respect to the latent variables $\mathbf{z}_n$, Bayes' Theorem leads us to the following formulation,
 $$
-\gamma(z_k) = P\{z_k = 1 \, | \, \mathbf{x} \} = \frac{\pi_k\mathcal{N}(\mathbf{x} |\mathbf{\mu}_k, \Sigma)}{\phi_1 \mathcal{N}(\mathbf{x} |\mathbf{\mu}_1, \Sigma) + \phi_2 \mathcal{N}(\mathbf{x} |\mathbf{\mu}_2, \Sigma)}
+\gamma(z_{nk}) = P\{z_{nk} = 1 \, | \, \mathbf{x} \} = \frac{\phi_k\mathcal{N}(\mathbf{x} |\mathbf{\mu}_k, \Sigma)}{\phi_1 \mathcal{N}(\mathbf{x} |\mathbf{\mu}_1, \Sigma) + \phi_2 \mathcal{N}(\mathbf{x} |\mathbf{\mu}_2, \Sigma)}
 $$
-Thus the parameters to be estimates are denoted by $\mathbf{\theta} = \{\mathbf{\mu}_1, \mathbf{\mu_2}, \phi_1, \phi_2, \Sigma \}$. Under the assumption of latent variables we consider the complete data likelihood to be
+Thus the parameters to be estimates are denoted by $\mathbf{\theta} = \{\mathbf{\mu}_1, \mathbf{\mu}_2, \phi_1, \phi_2, \Sigma \}$. Under the assumption of latent variables we consider the complete data likelihood to be
 $$
-p(\mathbf{X}, \mathbf{Z} \, | \, \mathbf{\theta}) = \prod_{n=1}^N \bigg\{ \bigg[\phi_1\mathcal{N}(\mathbf{x} |\mathbf{\mu}_1, \Sigma)\bigg]^{z_{n1}} \bigg[\phi_2 \mathcal{N}(\mathbf{x} |\mathbf{\mu}_2, \Sigma) \bigg]^{z_{n2}} \bigg\}
+p(\mathbf{X}, \mathbf{Z} \, | \, \mathbf{\theta}) = \prod_{n=1}^N \bigg\{ \bigg[\phi_1\mathcal{N}(\mathbf{x}_n |\mathbf{\mu}_1, \Sigma)\bigg]^{z_{n1}} \bigg[\phi_2 \mathcal{N}(\mathbf{x}_n |\mathbf{\mu}_2, \Sigma) \bigg]^{z_{n2}} \bigg\}
 $$
 and so the complete data log-likelihood is
 $$
-log \,p(\mathbf{X}, \mathbf{Z} \, | \, \mathbf{\theta}) = \sum_{n=1}^N\bigg\{ z_{n1}log\phi_1 + z_{n1} \, log \,\mathcal{N}(\mathbf{x} |\mathbf{\mu}_1, \Sigma) + z_{n2}log \phi_2 + z_{n2} \, log \, \mathcal{N}(\mathbf{x} |\mathbf{\mu}_2, \Sigma) \bigg\}
+log \,p(\mathbf{X}, \mathbf{Z} \, | \, \mathbf{\theta}) = \sum_{n=1}^N\bigg\{ z_{n1}log\phi_1 + z_{n1} \, log \,\mathcal{N}(\mathbf{x}_n |\mathbf{\mu}_1, \Sigma) + z_{n2}log \phi_2 + z_{n2} \, log \, \mathcal{N}(\mathbf{x}_n |\mathbf{\mu}_2, \Sigma) \bigg\}
 $$
 leading to the maximum likelihood estimates
 $$
 \begin{aligned}
-  \widehat{\pi}_k &= N_k/N \quad w.\,\, N_k = \sum_{n=1}^N \gamma_k(z_{nk}) \\
+  \widehat{\phi}_k &= N_k/N \quad w.\,\, N_k = \sum_{n=1}^N \gamma_k(z_{nk}) \\
   \widehat{\mathbf{\mu}}_k &= \frac{1}{N_k}\sum_{n=1}^N \gamma_k(z_{nk})x_n \\
   \Sigma_k^{\dagger} &= \frac{1}{N_k}\gamma_k(z_{nk})(\mathbf{x}_n - \mathbf{\mu}_k)(\mathbf{x}_n - \mathbf{\mu}_k)^T
 \end{aligned}
 $$
-The following function is to compute the multivariate Gaussian density. However, care must be taken as it involved inverting a covariance matrix. The base solve function in R can provide results that are ruined by rounding error. Since the covariance matrix is an SPD (semi) matrix the Cholesky factorization is a natural choice for speed and numerical stability.
+
+## Algorithm
+First we must initialize $\theta_0$. Then,
+
+1. E-Step: Compute $\gamma(z_{nk})$ using $\theta_0$
+2. M-Step: Re-estimate the model parameters using the maximum likelihood estimates shown above.
+3. Iterate over steps one and two until convergence.
+
+Convergence is reached when the change to expected log-likelihood after an interation is within our specified tolerance. Mathematically,
+$$
+\mathbb{E}_{\mathbf{Z}|\theta^{(t+1)},\mathbf{X}}[log(\theta^{(t+1)}\,|\,\mathbf{Z},\mathbf{X})] \leq \mathbb{E}_{\mathbf{Z}|\theta^{(t)},\mathbf{X}}[log(\theta^{(t)}\,|\,\mathbf{Z},\mathbf{X})] + \epsilon
+$$
+where $\epsilon$ is our tolerance. We will set this to be $10^{-4}$.
+
+We will need to make use of the following function to compute the multivariate Gaussian density. However, care must be taken as it involved inverting a covariance matrix. The base solve function in R can provide results that are ruined by rounding error. Since the covariance matrix is an SPD (semi) matrix the Cholesky factorization is a natural choice for speed and numerical stability.
 ```{r}
 normal_density <- function(x, mean, sigma) {
   cf <- chol(sigma)
@@ -306,8 +322,12 @@ EM <- function(x, init, max.iter, tol=10e-4) {
        responsibilities = E_$responsibilities, loglik = loglik.vec)
 }
 ```
+
+## Initializing Parameters
+Because the performance of the algorithm relies on initial parameters, some methods are worth consideration. Based on a paper by Dimitris Karlis, and  Evdokia Xekalaki (https://www.sciencedirect.com/science/article/pii/S0167947302001779) there is evidence that for poorly seperated clusters, random initial assignment can lead to bad performance. Moment matching is another popular approach, but may be computationally problematic. The data we have generated allows us to make some observations on the structure of the data. For instance, the axis of the ellipse formed by the two groups suggests that the covariance matrices $\Sigma_k$ would have positive off-diagonal entries (positive correlation coefficients). Since EM, similar to K-means, does not guarantee convergence to a global maximum (or minimum), we can improve the chances of finding it by running the procedure for a set of sensible initial values and comparing. However, we initialize knowing what the true parameters are and thus likely find the global maximum nonetheless.
+
 ```{r}
-theta.init <- list(0.5, 0.5, c(0,0), c(1,1), diag(2), diag(2)) # initializations
+theta.init <- list(0.5, 0.5, c(0,0), c(1,1), diag(2), diag(2))
 res <- EM(sample, theta.init, 100)
 pred <- apply(res$responsibilities, 1, function(row) which.max(row))
 mc_err2 <- mean(pred != classes)
@@ -322,12 +342,12 @@ p
 
 conv <- data.frame("Iterations" = 1:length(res$loglik), "LogLikelihood" = res$loglik)
 p <- ggplot(conv, aes(Iterations, LogLikelihood)) + geom_line() + geom_point() + theme_bw() +
-  ylim(range(res$loglik[2:length(res$loglik)]))
+  ylim(range(res$loglik[2:length(res$loglik)])) + xlim(5,30)
 suppressWarnings(print(p))
 ```
 # Results
 
-The K-Means procedure converges in about 10 iterations whereas the EM converges in about 30. The K-Means is very clearly biased with respect to the $L_2$ norm. It uses hard partitioning to assign points to each cluster vs. the EM, which assigns based on the expectation of a point belonging to a particular cluster. Therefore, it can be seen that K-Means does not take into account the covariance structure of the data like the EM does. This produces difference in the misclassification errors between the two methods. To demonstrate that this conclusion is not dependent of the data we will generate new multivariate Gaussian data and run the procedures again.
+The K-Means procedure converges in about 10 iterations whereas the EM converges in about 30. The K-Means is very clearly biased with respect to the $L_2$ norm. It uses hard partitioning to assign points to each cluster vs. the EM, which assigns based on the expectation of a point belonging to a particular cluster. Therefore, it can be seen that K-Means does not take into account the covariance structure of the data like the EM does. This produces difference in the misclassification errors between the two methods. To demonstrate that this conclusion may be dependent on the data we will generate new multivariate Gaussian data and run the procedures again.
 
 ```{r}
 data <- list()
@@ -357,9 +377,12 @@ for (i in 1:10) {
 }
 new_results$Absolute_Diff <- abs(new_results$K_Means - new_results$EM)
 new_results
-sum(new_results$K_Means>new_results$EM)/10
 ```
-By applying the two algorithms for 10 independent realizations of the data we can see that performance depends greatly on the data. However, EM is much better suited for capturing the structure since the data was generated from a mixture of Gaussians. If the clusters were better seperated, both methods would give similair results but K-means converges faster. It is also worth noting that the generative EM model, is able to produce new observations.
 
-To view an interactive web application showcasing the performance of the methods discussed here visit: https://derekwayne.shinyapps.io/KM_and_EM/
+By applying the two algorithms for 10 independent realizations of the data we can see that performance depends greatly on the data. However, EM is much better suited for capturing the structure since the data was generated from a mixture of Gaussians. If the clusters were better seperated, both methods would give similair results but K-means converges faster. It is also worth noting that the generative EM model, is able to produce new observations. We would simple need to generate a bivariate normal data point with the parameters estimated in EM.
+
+* To experiment with an interactive application, generating new data, and applying the procedures, click here: https://derekwayne.shinyapps.io/KM_and_EM/
+
+
+
 
