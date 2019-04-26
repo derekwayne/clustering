@@ -59,7 +59,7 @@ ui <- fluidPage(
       ),
       sliderInput(inputId = "sigma12",
                   label = "Covariance for class 1 (off diagonal):",
-                  min = 1,
+                  min = -10,
                   max = 10,
                   value = 7
       ),
@@ -72,7 +72,7 @@ ui <- fluidPage(
       ),
       sliderInput(inputId = "sigma22",
                   label = "Covariance for class 2 (off diagonal):",
-                  min = 1,
+                  min = -10,
                   max = 10,
                   value = 7
       )

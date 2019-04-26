@@ -3,24 +3,23 @@ title: "Cluster Analysis"
 author: "Derek Wayne"
 date: "`r format(Sys.time(), '%d %B %Y')`"
 output:
-  rmdformats::html_clean:
+  html_document:
     df_print: paged
-    gallery: no
     highlight: tango
-    lightbox: yes
-    self_contained: yes
-    thumbnails: yes
+    toc: true
+    toc_float: true
 knit: (function(input_file, encoding) { out_dir <- 'docs'; rmarkdown::render(input_file,
   encoding=encoding, output_file=file.path(dirname(input_file), out_dir, 'index.html'))})
 subtitle: Comparison of K-Means and EM
-abstract: |
-  This is meant to be a short overview of the implementation of the K-means and EM algorithms for clustering generated
-  multivariate normal data. Performance of the two procedures is compared to gain a deeper understanding of their advantages
-  and limitations. "That which has been hidden to you, will eventuall be brought out into the light", a passage from the Bible about how through knowledge of God one dispels ignorance
 ---
+# Introduction
+
+The task of identifying distinct clusters for which data objects may be assigned to involves many different procedures, each with thier own advantages and disadvantes. Which method is the most efficient at accomplishing the objective is dependent on the structure of the data. Two of the most recognized kinds of algorithms used are K-means and expectation maximization, which fall under the category of unsupervised learning techniques. This is because we assume that the target labels (which cluster each data object belongs to) is unknown. To measure the relative quality of a clustering method it is necessary to compare the intra-class similarity and inter-class similarity between data objects. Through this type of analysis the patterns and structure of the data should become more apparent. Thus, a typical application would be for exploratory data analysis, or preprocessing for use with other algorithms.
+
+
 # Data and Model
 
-In the following analysis we will be working with data generated from a Gaussian mixture density. In particular we use two mixture components, each having a bivariate normal distribution, parameterized by means $\mu_1, \mu_2 \in \mathbb{R}^2$, and covariance matrices  $\Sigma_1, \Sigma_2 \in \mathbb{R}^{2\times2}$. Therefore the model for the data will be:
+We will be working with synthetic data generated from a Gaussian mixture density. In particular we use two mixture components, each having a bivariate normal distribution, parameterized by means $\mu_1, \mu_2 \in \mathbb{R}^2$, and covariance matrices  $\Sigma_1, \Sigma_2 \in \mathbb{R}^{2\times2}$. Therefore the model for the data will be:
 $$
 f(\mathbf{x}, \theta) = \phi_1\mathcal{N}(\mathbf{x} \, | \, \mu_1, \Sigma_1) + \phi_2\mathcal{N}(\mathbf{x} \, | \, \mu_2, \Sigma_2)
 $$
@@ -43,8 +42,8 @@ We would obtain the same population distribution if instead $\mu_1 = \begin{bmat
 Since we are interested in comparing performance between two clustering algorithms we wish to preserve the class label indicating which sample data point came from which subpopulation. When we then implement K-means and EM over the data we will hide the label and report misclassifications.
 
 ```{r}
-library(MASS)
-library(ggplot2)
+library(MASS) # for multivariate normal gen
+library(ggplot2) # aesthetic plotting
 set.seed(101)
 # Parameters
 mu_1 <- c(0.1, 0.1); mu_2 <- c(6.0, 0.1)
@@ -64,7 +63,7 @@ data["Class"] <- as.factor(classes)
 
 ### Without labels
 
-```{r echo=FALSE, fig.show= "hold", fig.align='center', fig.cap="Generated Bivariate Normal Data", out.width="70%"}
+```{r echo=FALSE, fig.show= "hold", fig.align='center', fig.cap="Generated Bivariate Normal Data", out.width="50%"}
 p <- ggplot(data, aes(X1, X2, color=factor(1))) +
   geom_point() + theme_bw()
 legend <- theme(legend.position = c(0.9, 0.2))
@@ -74,16 +73,16 @@ ggplot(data, aes(X1, X2)) + geom_density_2d(colour="red") + theme_bw()
 
 ### With labels
 
-```{r echo =FALSE, fig.align='center', fig.cap="Generated Bivariate Normal Data"}
+```{r echo =FALSE, fig.align='center', fig.cap="Generated Bivariate Normal Data", out.width="50%"}
 p <- ggplot(data, aes(X1, X2, color = Class)) +
   geom_point() + stat_ellipse(type = "norm") + theme_bw()
 legend <- theme(legend.position = c(0.9, 0.2))
 p + legend + scale_color_brewer(palette="Dark2")
 ```
 
-## Number of components
+## Number of clusters
 
-If we were completely ignorant of the number of clusters then we could resort to the ad-hoc method of "eyeing" the distribution. The amount of separation between the clusters seems problematic. Looking at the contour plot, we see that two peaks are likely present and so we should start by assuming that we have two coponents in our mixture. This assumption will be validated later for goodness.
+In this analysis we know how the data was generated and so we do not feign ignorance. A discussion of determining the optimal number of clusters will be delayed, and so two are assumed. The amount of separation between the two clusters seems problematic. Looking at the contour plot, we see that two peaks are likely present and so our assumption has some evidence of validity.
 
 
 # K-Means
@@ -163,7 +162,7 @@ km_ <- function(x, centroid, R, max.iter) {
 Before letting the algorithm run we must choose initial centroid locations. This choice can have an effect on overall performance of the procedure as mentioned earlier. Typically we would get better performance when the inital centroid are not assigned too close together. One way to approach this is called *K-means++*, see *k-means++: The Advantages of Careful Seeding* http://ilpubs.stanford.edu:8090/778/1/2006-13.pdf.
 
 1. Uniformly assign one data point as the first initial centroid.
-2. Compte the euclidean distance between the centroid and all other data points.
+2. Compute the euclidean distance between the centroid and all other data points.
 3. Assign the next centroid to a data point with probability proportional to its squared distance from the first centroid.
 ```{r}
 X <- sample
@@ -182,7 +181,7 @@ r <- km_(X, centroid, R, max.iter = 20)
 mc_err <- mean(classes != r$cluster)
 ```
 
-```{r echo=FALSE, fig.show = "hold", out.width = "50%", fig.cap="Results of K-means"}
+```{r echo=FALSE, fig.show = "hold", fig.cap="Results of K-means", out.width="50%"}
 data <- data.frame("X1"=X[1,], "X2"=X[2,], "Class"=factor(r$cluster))
 ggplot(data, aes(x=X1, y=X2, col=Class)) + geom_point() +
   geom_point(aes(x=r$centroid[1,1],y=r$centroid[1,2]),
@@ -197,7 +196,61 @@ ggplot(conv, aes(Iterations, Cost)) + geom_line() + geom_point() + theme_bw()
 ```
 
 ## Results of K-Means
-The misclassification error is then `r mc_err`. From the resulting plot it is evident that K-means is not appropriate for this particular dataset. This of course is obvious since we know how the data was generated. A not so obvious drawback from this analysis is that the number of components was required a-priori. In practice, a bad guess can lead to incorrect results. In the case of the data used here, the clusters are not easily separable and the algorithm has given suboptimal splits between cluster means. In other examples this outcome may occur even with reasonably separable clusters due to the convergence to local minima. The two steps involved in the algorithm involve computing first, an expectation, and second, finding a minimum (which can be shown to be equivalent to finding a maximum). Thus, K-means can be seen as a variant of a more flexible model -- the expectation maximization algorithm (EM).
+The misclassification error is then `r mc_err`. From the resulting scatterplot we can see that the algorithm converged to a local minimum, which resulted in a suboptimal split. The dependence of the cost function on euclidean distance implies that this method would work best on spherical clusters. The results would also likely be different depending on the number of clusters we assumed. 
+
+## Silhouette analysis
+
+A silhoutte analysis will help to give an idea of how well each observation is suited for its assigned cluster, and help to compare the results assuming different numbers of clusters. The silhoutte value will be a score from -1 to +1, where higher values are an indication of a good assignment (being very similar to other points within its cluster), and lower values signifying a poorer assignment. We can use the average silhoutte score given by running K-means with different numbers of clusters specified and look for a maximum. 
+
+
+```{r, echo=F}
+suppressMessages(suppressWarnings(library(cluster)))
+suppressMessages(suppressWarnings(library(factoextra)))
+```
+```{r}
+nc <- data.frame("K"=1:10, "avg.width"=numeric(10))
+for (i in 2:10) {
+  km.r <- kmeans(sample, i)
+  sil <- silhouette(km.r$cluster, dist(sample))
+  sil <- summary(sil)
+  nc$avg.width[i] <- sil$avg.width
+}
+```
+
+## Validation Plots {.tabset}
+
+### Two assumed clusters
+
+```{r echo=FALSE, fig.show="hold", out.width="50%"}
+ggplot(nc, aes(K,avg.width)) + geom_point(shape = 18, size = 3) +
+  geom_line() + geom_vline(xintercept = 2, linetype="dashed", size = 1.2, color = "red") + theme_bw()
+r1 <- eclust(sample, "kmeans", k = 2,
+                 nstart = 25, graph = FALSE)
+fviz_silhouette(r1, print.summary = FALSE) +
+  scale_fill_brewer(palette = "Dark2") +
+  scale_color_brewer(palette = "Dark2") +
+  theme_bw()+
+  theme(axis.text.x = element_blank(), axis.ticks.x = element_blank())
+```
+
+### Three assumed clusters
+
+```{r echo=FALSE, fig.show="hold", out.width="50%"}
+ggplot(nc, aes(K,avg.width)) + geom_point(shape = 18, size = 3) +
+  geom_line() + geom_vline(xintercept = 3, linetype="dashed", size = 1.2, color = "red") + theme_bw()
+r2 <- eclust(sample, "kmeans", k = 3,
+                 nstart = 25, graph = FALSE)
+fviz_silhouette(r2, print.summary = FALSE) +
+  scale_fill_brewer(palette = "Dark2") +
+  scale_color_brewer(palette = "Dark2") +
+  theme_bw()+
+  theme(axis.text.x = element_blank(), axis.ticks.x = element_blank())
+```
+ 
+## 
+The silhoutte method of validation suggests that two clusters is optimal. However, these heruistic methods have their disadvantages. An alternative approach is to use the *gap statistic*, or to instead of K-means use *hierarchal clustering*, which avoids the problem altogether.
+
+The two steps of K-means involve computing first, an expectation, and second, finding a minimum (which can be shown to be equivalent to finding a maximum). Thus, K-means can be seen as a variant of a more flexible model -- the expectation maximization algorithm (EM).
 
 
 # EM
@@ -263,6 +316,7 @@ normal_density <- function(x, mean, sigma) {
 Below is the implementation of the EM algorithm.
 ```{r}
 e_step <- function(x, theta) {
+  # extract each parameter from theta -- a list
   mix.p <- c(theta[[1]], theta[[2]])
   mu_1 <- theta[[3]]; mu_2 <- theta[[4]]
   Sigma_1 <- theta[[5]]
@@ -319,7 +373,12 @@ EM <- function(x, init, max.iter, tol=10e-4) {
 ```
 
 ## Initializing Parameters
-Because the performance of the algorithm relies on initial parameters, some methods are worth consideration. Based on a paper by Dimitris Karlis, and  Evdokia Xekalaki (https://www.sciencedirect.com/science/article/pii/S0167947302001779) there is evidence that for poorly seperated clusters, random initial assignment can lead to bad performance. Moment matching is another popular approach, but may be computationally problematic. The data we have generated allows us to make some observations on the structure of the data. For instance, the axis of the ellipse formed by the two groups suggests that the covariance matrices $\Sigma_k$ would have positive off-diagonal entries (positive correlation coefficients). Since EM, similar to K-means, does not guarantee convergence to a global maximum (or minimum), we can improve the chances of finding it by running the procedure for a set of sensible initial values and comparing. However, we initialize knowing what the true parameters are and thus likely find the global maximum nonetheless.
+In this analysis we naively initialize both covariance matrices as $\Sigma = \begin{bmatrix} 2 & 0 \\ 0 & 2 \end{bmatrix}$, and $\mu_1 = (0,0)^T, \, \mu_2 = (1,1)^T$. Using our results from k-means we see that the proportion of data points assigned to each class is:
+```{r}
+r1$size / ncol(X)
+```
+Suggesting that $\phi_1=\phi_2 = 1/2$, will be a good initial candidate (as we secretly already know).
+
 
 ```{r}
 theta.init <- list(0.5, 0.5, c(0,0), c(1,1), diag(2), diag(2))
@@ -328,9 +387,10 @@ pred <- apply(res$responsibilities, 1, function(row) which.max(row))
 mc_err2 <- mean(pred != classes)
 ```
 Difference in misclassification error: kmeans: `r mc_err`, EM: `r mc_err2`.
-```{r echo=FALSE, fig.show = "hold", out.width = "50%", fig.cap="Clustering by EM"}
+```{r echo=FALSE, fig.show = "hold", fig.cap="Clustering by EM", out.width="50%"}
 data <- data.frame(X1 = sample[,1], X2 = sample[,2], "Class" =  as.factor(pred))
-p <- ggplot(data, aes(X1, X2, color = Class)) +
+data$p <- apply(res$responsibilities, 1, max) # uncertainty of assignment
+p <- ggplot(data, aes(X1, X2, color = Class, alpha = p)) +
   geom_point() + stat_ellipse(type = "norm") +
   theme_bw() + scale_color_brewer(palette="Dark2")
 p
@@ -340,9 +400,16 @@ p <- ggplot(conv, aes(Iterations, LogLikelihood)) + geom_line() + geom_point() +
   ylim(range(res$loglik[2:length(res$loglik)])) + xlim(5,30)
 suppressWarnings(print(p))
 ```
-# Results
+## Results of EM and Comparisons
 
-The K-Means procedure converges in about 10 iterations whereas the EM converges in about 30. The K-Means is very clearly biased with respect to the $L_2$ norm. It uses hard partitioning to assign points to each cluster vs. the EM, which assigns based on the expectation of a point belonging to a particular cluster. Therefore, it can be seen that K-Means does not take into account the covariance structure of the data like the EM does. This produces difference in the misclassification errors between the two methods. To demonstrate that this conclusion may be dependent on the data we will generate new multivariate Gaussian data and run the procedures again.
+From the above plots we can see that EM converges slowly (in about 25-30 iterations). The scatterplot indicates a much better fit to the structure of the data, as we would expect, since the data was generated from a mixture of Gaussians. The K-Means is very clearly biased with respect to the $L_2$ norm and so fails to capture the same structure. Another difference between these two procedures to take into consideration is how they each partition the data. K-means performs *hard partitioning*, by assigning each observation to one particular cluster. EM, on the other hand uses *soft partitioning* through the calculation of the expectation of an observation belonging to one cluster or the other. Thus, through EM we get for free, the probability that any observation belongs to each cluster in addition to estimates of the underlying model parameters. The uncertainty of each assignment is shown through the opacity of each observation in the scatterplot. Clearly, the most uncertain assignments occur where the seperation between clusters is smallest.  It is also worth noting that the generative EM model, is able to produce new observations. We would simply need to generate a bivariate normal data point with the parameters estimated in EM. For example, we can produce a sample observation from a subpopulation:
+```{r}
+mvrnorm(n=1, mu=res$mu1, Sigma = res$sig1)
+```
+
+# Conclusion
+
+Uncovering this sort of knowledge of our data is one of the advantages of performing a cluster analysis. No single procedure will work well universally and so we must apply these steps of exploration in an iterative fashion until we achieve better results. To wrap up, we will generate 10 independent realizations of the bivariate Gaussian data and see how the algorithms compare with respect to misclassification errors.
 
 ```{r}
 data <- list()
@@ -374,10 +441,12 @@ new_results$Absolute_Diff <- abs(new_results$K_Means - new_results$EM)
 new_results
 ```
 
-By applying the two algorithms for 10 independent realizations of the data we can see that performance depends greatly on the data. However, EM is much better suited for capturing the structure since the data was generated from a mixture of Gaussians. If the clusters were better seperated, both methods would give similair results but K-means converges faster. It is also worth noting that the generative EM model, is able to produce new observations. We would simple need to generate a bivariate normal data point with the parameters estimated in EM.
+From the above table we can see that performance depends greatly on the data. This is mainly due to the strong dependence on initial parameters for a good fit. There are also methods for choosing initial parameters which will give better results than those above, where we simply reused our earlier initializations. Ultimately, EM is much better suited for capturing the structure since the data was generated from a mixture of Gaussians. If the clusters were better seperated, both methods would give similair results but K-means converges faster.
+
 
 * To experiment with an interactive application, generating new data, and applying the procedures, click here: https://derekwayne.shinyapps.io/KM_and_EM/
 
+* A possible future edit would be to include an implementation of the various methods of parameter initialization for EM.
 
 
 

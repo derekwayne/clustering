@@ -5,8 +5,8 @@ account: derekwayne
 server: shinyapps.io
 hostUrl: https://api.shinyapps.io/v1
 appId: 872628
-bundleId: 2019125
+bundleId: 2039929
 url: https://derekwayne.shinyapps.io/KM_and_EM/
-when: 1555523872.52404
+when: 1556236770.96806
 asMultiple: FALSE
 asStatic: FALSE
