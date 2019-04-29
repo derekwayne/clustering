@@ -15,4 +15,4 @@ The comparison is done using generated data from the bivariate normal distributi
 3. [cluster](https://cran.r-project.org/web/packages/cluster/index.html): Functions for clustering.
 4. [factoextra](https://cran.r-project.org/web/packages/factoextra/index.html): ggplot2 compatible silhoutte plots.
 
-Most of the important functions were written by myself for instructive purposes. To view the project in a browser, visit the link beside the repository name in the code tab.
+Most of the important functions were written by myself for instructive purposes. To view the project in a browser, visit the link beside the repository description in the code tab.
