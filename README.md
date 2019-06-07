@@ -2,7 +2,7 @@
 
 ## Purpose
 
-The goal of this project is to look deeper into one of the most common methods of grouping objects on the basis of their similarity. The K-means and EM algorithm can both be used for this general purpose but differ in their strengths and weaknesses.
+The goal of this project is to look deeper into the most common methods of grouping objects on the basis of their similarity. The K-means and EM algorithm can both be used for this general purpose but differ in their strengths and weaknesses.
 
 ![](methods.png)
 
