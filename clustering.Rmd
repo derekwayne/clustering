@@ -7,9 +7,9 @@ output:
     df_print: paged
     highlight: tango
     includes:
-      before_body: header.html
-      after_body: footer.html
-    css: style.css
+      before_body: docs/header.html
+      after_body: docs/footer.html
+    css: docs/style.css
 knit: (function(input_file, encoding) { out_dir <- 'docs'; rmarkdown::render(input_file,
   encoding=encoding, output_file=file.path(dirname(input_file), out_dir, 'index.html'))})
 subtitle: Comparison of K-Means and EM
