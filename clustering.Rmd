@@ -1,7 +1,8 @@
 ---
 title: "<br>Cluster Analysis"
 author: "Derek Wayne"
-date: "`r format(Sys.time(), '%d %B %Y')`"
+date: "25 May 2019"
+description: Analysis of clustering methods for unsupervised machine learning.
 output:
   html_document:
     df_print: paged
